@@ -9,6 +9,7 @@
  *     repeat: boolean,
  *     isFixed: boolean,
  *     customWidth: string  // e.g. "320px", "50%"
+ *     zoom: number         // 1 = as drawn; up to 3, about the focal point
  *   }
  *
  * Features (toggleable via control config):
@@ -16,12 +17,19 @@
  *   - enableSizeOptions       (default true)  → cover / contain / tile + custom width
  *   - enableRepeatOptions     (default true)  → repeat toggle (when size != cover)
  *   - enableFixedBackground   (default true)  → background-attachment: fixed
+ *   - enableZoom              (default true)  → zoom 1–3× about the focal point (cover)
+ *   - settingsInline          (default false) → the settings sit in the field itself,
+ *                                               not in a popover of their own; the
+ *                                               host already shows them in a panel
+ *                                               (gcb-lite's block-toolbar image field)
+ *                                               and carries the label there
  */
 
 import { __ } from '@wordpress/i18n';
 import {
 	Button,
 	FocalPointPicker,
+	RangeControl,
 	Icon,
 	ToggleControl,
 	__experimentalToggleGroupControl as ToggleGroupControl,
@@ -81,6 +89,7 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 	const enableSizeOptions = control.enableSizeOptions !== false;
 	const enableRepeatOptions = control.enableRepeatOptions !== false;
 	const enableFixedBackground = control.enableFixedBackground !== false;
+	const enableZoom = control.enableZoom !== false;
 
 	const imageValue = value || {};
 	const focalPoint = imageValue.focalPoint || { x: 0.5, y: 0.5 };
@@ -88,6 +97,7 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 	const customWidth = imageValue.customWidth || '';
 	const repeat = imageValue.repeat !== false;
 	const isFixed = imageValue.isFixed || false;
+	const zoom = Number(imageValue.zoom) > 1 ? Number(imageValue.zoom) : 1;
 
 	const updateValue = (updates) => onChange({ ...imageValue, ...updates });
 
@@ -144,6 +154,23 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 					url={imageValue.url}
 					value={focalPoint}
 					onChange={(p) => updateValue({ focalPoint: p })}
+				/>
+			)}
+
+			{/* Zoom fills the frame from closer in, about the focal point —
+			    it only means something when the picture covers its frame. */}
+			{enableZoom && size === 'cover' && (
+				<RangeControl
+					label={__('Zoom', 'gcblite')}
+					value={zoom}
+					min={1}
+					max={3}
+					step={0.05}
+					withInputField
+					allowReset
+					resetFallbackValue={1}
+					onChange={(v) => updateValue({ zoom: Number(v) > 1 ? Number(v) : 1 })}
+					__nextHasNoMarginBottom
 				/>
 			)}
 
@@ -221,12 +248,15 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 
 export default function ImageField({ control, value, onChange }) {
 	const imageValue = value || {};
+	const inline = control.settingsInline === true;
 
 	return (
 		<div className="components-base-control gcb-image-control">
-			<div className="components-base-control__field">
-				<label className="components-base-control__label">{control.label}</label>
-			</div>
+			{!inline && (
+				<div className="components-base-control__field">
+					<label className="components-base-control__label">{control.label}</label>
+				</div>
+			)}
 			{control.helpText && (
 				<p className="components-base-control__help">{control.helpText}</p>
 			)}
@@ -269,7 +299,26 @@ export default function ImageField({ control, value, onChange }) {
 								</>
 							)}
 
-							{imageValue?.url && (
+							{imageValue?.url && inline && (
+								<div className="gcb-image-control-content--inline">
+									<ImageControlContent
+										control={control}
+										value={imageValue}
+										onChange={onChange}
+										onReplace={open}
+									/>
+									<Button
+										variant="link"
+										isDestructive
+										onClick={() => onChange(null)}
+										style={{ marginTop: 12 }}
+									>
+										{__('Remove image', 'gcblite')}
+									</Button>
+								</div>
+							)}
+
+							{imageValue?.url && !inline && (
 								<PopoverOrModal
 									modalTitle={control.label || __('Image settings', 'gcblite')}
 									dropdownProps={{ popoverProps: { placement: 'left-start' } }}

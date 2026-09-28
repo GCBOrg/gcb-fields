@@ -27,6 +27,7 @@ export {
 // Inspector renderer + the control registry.
 export { renderInspector } from './inspector';
 export { controlComponents } from './controls';
+export { ImageControlContent } from './controls/image';
 
 // Conditional logic + validation/control contexts (host-overridable).
 export { shouldRender, panelsContainingErrors, STRUCTURAL_TYPES } from './conditional-logic';
