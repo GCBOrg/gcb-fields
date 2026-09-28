@@ -23,7 +23,7 @@
  */
 
 import { __ } from '@wordpress/i18n';
-import { useState, useEffect, useContext } from '@wordpress/element';
+import { useState, useEffect, useContext, useRef } from '@wordpress/element';
 import {
 	Button,
 	Icon,
@@ -359,6 +359,8 @@ export default function RichtextField({ control, value, onChange }) {
 
 	const [modalOpen, setModalOpen] = useState(false);
 
+	/* the value last given from outside, to tell a sync from an edit */
+	const syncedRef = useRef(value || '');
 	const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
@@ -377,6 +379,13 @@ export default function RichtextField({ control, value, onChange }) {
 		content: value || '',
 		onUpdate: ({ editor: ed }) => {
 			const html = ed.getHTML();
+			/* A SYNC IS NOT AN EDIT (gcb-lite, 2026-09-28): when the value
+			   changes from outside — typed in place on the canvas — the
+			   editor re-reads it and re-serialises it its own way, wrapped
+			   in <p>; writing that back turned a bold word in an <h1> into
+			   "<p><strong>…</strong>…</p>". Only a real change is sent. */
+			const incoming = syncedRef.current;
+			if (html === incoming || html === '<p>' + incoming + '</p>') return;
 			// Tiptap returns "<p></p>" for an empty document. Normalise
 			// to '' so validation's required-check still triggers on
 			// truly-empty input.
@@ -392,7 +401,10 @@ export default function RichtextField({ control, value, onChange }) {
 		const incoming = value || '';
 		if (current === incoming) return;
 		if (current === '<p></p>' && incoming === '') return;
-		editor.commands.setContent(incoming, false);
+		syncedRef.current = incoming;
+		// Tiptap 3 takes options here; a bare `false` (Tiptap 2's
+		// emitUpdate) is ignored and the sync fires onUpdate.
+		editor.commands.setContent(incoming, { emitUpdate: false });
 	}, [value, editor]);
 
 	// Popover or Modal: collapsed button + opens the editor in an
