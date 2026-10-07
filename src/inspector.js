@@ -30,6 +30,8 @@ export { shouldRender, panelsContainingErrors };
  *   ungrouped controls flat (no outer "Settings" PanelBody). Used by the
  *   post-fields meta-box where the meta-box itself IS the panel — nesting
  *   another PanelBody would look like a redundant dropdown.
+ * @param {string} [options.clientId] The block the controls belong to — passed to every control as `clientId`.
+ * @param {string} [options.blockName] Its block name — passed to every control as `blockName`.
  * @param {Set<string>} [options.forceOpenPanelIds] Panel ids to render
  *   with initialOpen=true. Used by the meta-box to auto-open any panel
  *   containing a field that just failed validation, so the user can see
@@ -37,6 +39,9 @@ export { shouldRender, panelsContainingErrors };
  */
 export function renderInspector(controls, attributes, setAttributes, options = {}) {
 	const { groups, ungrouped } = bucketControls(controls);
+	// Where the controls are: handed to every control, so one that edits the block tree (a pin map adding the block's
+	// children) is told its block instead of guessing from the selection (gcb-lite TODO, 2026-10-07).
+	const where = { clientId: options.clientId, blockName: options.blockName };
 	const flatten = options.flatten === true && groups.length === 0;
 	const forceOpen = options.forceOpenPanelIds || new Set();
 
@@ -45,12 +50,12 @@ export function renderInspector(controls, attributes, setAttributes, options = {
 			{ungrouped.length > 0 && (
 				flatten ? (
 					ungrouped.map((control) =>
-						renderControl(control, attributes, setAttributes)
+						renderControl(control, attributes, setAttributes, where)
 					)
 				) : (
 					<PanelBody title={__('Settings', 'gcblite')} initialOpen={true}>
 						{ungrouped.map((control) =>
-							renderControl(control, attributes, setAttributes)
+							renderControl(control, attributes, setAttributes, where)
 						)}
 					</PanelBody>
 				)
@@ -65,7 +70,7 @@ export function renderInspector(controls, attributes, setAttributes, options = {
 					initialOpen={forceOpen.has(group.id)}
 				>
 					{children.map((control) =>
-						renderControl(control, attributes, setAttributes)
+						renderControl(control, attributes, setAttributes, where)
 					)}
 				</PanelBody>
 			))}
@@ -105,7 +110,7 @@ function bucketControls(controls) {
 	};
 }
 
-function renderControl(control, attributes, setAttributes) {
+function renderControl(control, attributes, setAttributes, where = {}) {
 	if (!shouldRender(control, attributes)) {
 		return null;
 	}
@@ -135,6 +140,8 @@ function renderControl(control, attributes, setAttributes) {
 				value={value}
 				onChange={onChange}
 				attributes={attributes}
+				clientId={where.clientId}
+				blockName={where.blockName}
 			/>
 		</ValidationWrapper>
 	);
