@@ -58,15 +58,28 @@ let iconFetchError = null;
 
 async function fetchAllIconPages() {
 	// WP 7.0's icons endpoint caps per_page at 100 and there are 88
-	// core icons. WP 7.1+ will let plugins register more, so paginate
-	// at 100/page until a short page comes back.
+	// core icons. WP 7.1+ lets plugins register more, so paginate at
+	// 100/page — but WP's endpoint IGNORES page/per_page and returns every
+	// icon each time (2026-10-07, gcb-lite's Showman's Show kit: with 102
+	// icons every page was "full", so this made 49 identical requests and
+	// every icon field read "Unknown icon" meanwhile). So stop when the
+	// server says it was the last page, or a page brings nothing new.
 	const all = [];
+	const seen = new Set();
 	for (let page = 1; page < 50; page++) {
 		// eslint-disable-next-line no-await-in-loop
-		const chunk = await apiFetch({ path: `/wp/v2/icons?per_page=100&page=${page}` });
+		const res = await apiFetch({ path: `/wp/v2/icons?per_page=100&page=${page}`, parse: false });
+		// eslint-disable-next-line no-await-in-loop
+		const chunk = res && typeof res.json === 'function' ? await res.json() : res;
 		if (!Array.isArray(chunk) || chunk.length === 0) break;
-		all.push(...chunk);
-		if (chunk.length < 100) break;
+		const fresh = chunk.filter((icon) => icon && !seen.has(icon.name));
+		if (fresh.length === 0) break;
+		fresh.forEach((icon) => seen.add(icon.name));
+		all.push(...fresh);
+		const totalPages = res && res.headers && typeof res.headers.get === 'function'
+			? parseInt(res.headers.get('X-WP-TotalPages'), 10)
+			: NaN;
+		if (chunk.length < 100 || (Number.isFinite(totalPages) && page >= totalPages)) break;
 	}
 	return all;
 }
