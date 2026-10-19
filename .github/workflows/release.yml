@@ -1,0 +1,51 @@
+# Publish @wordpress-gcb/fields to npm when a version tag is pushed (git tag vX.Y.Z && git push origin vX.Y.Z).
+# npm trusted publishing: npm trusts this workflow by name (npmjs.com → package → Settings → Trusted publisher),
+# so there is no token or one-time password. Provenance is attached automatically (public repo, public package).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write # the OIDC token npm trusts
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # trusted publishing needs npm 11.5.1 or later
+      - run: npm install -g npm@^11.5.1
+
+      - name: The tag names the version in package.json
+        run: |
+          want="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json ($want)"
+            exit 1
+          fi
+
+      - name: Already on npm?
+        id: seen
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          if npm view "@wordpress-gcb/fields@$v" version >/dev/null 2>&1; then
+            echo "::notice::@wordpress-gcb/fields@$v is already published; nothing to do"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.seen.outputs.published != 'true'
+        run: npm ci
+
+      # prepublishOnly builds dist/ — the package ships dist/, never src/
+      - if: steps.seen.outputs.published != 'true'
+        run: npm publish --access public
