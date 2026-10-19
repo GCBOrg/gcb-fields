@@ -10,6 +10,7 @@
  *     isFixed: boolean,
  *     customWidth: string  // e.g. "320px", "50%"
  *     zoom: number         // 1 = as drawn; up to 3, about the focal point
+ *     scale: number        // a contained logo's size, in % (80–125; 100 = as the set)
  *   }
  *
  * Features (toggleable via control config):
@@ -18,6 +19,11 @@
  *   - enableRepeatOptions     (default true)  → repeat toggle (when size != cover)
  *   - enableFixedBackground   (default true)  → background-attachment: fixed
  *   - enableZoom              (default true)  → zoom 1–3× about the focal point (cover)
+ *   - contained               ('logos' | 'alike', default none) → a picture that must show
+ *                                               its whole object (gcb-pro's data-gcb-contain):
+ *                                               nothing that crops or moves it is offered; a
+ *                                               logo gets a Scale (80–125%) for a file that
+ *                                               reads light or carries its own padding
  *   - settingsInline          (default false) → the settings sit in the field itself,
  *                                               not in a popover of their own; the
  *                                               host already shows them in a panel
@@ -85,11 +91,13 @@ function resolveAllowedTypes(control) {
  * Exported so the gallery control can reuse it for each gallery row.
  */
 export function ImageControlContent({ control, value, onChange, onReplace }) {
-	const enableFocalPoint = control.enableFocalPoint !== false;
-	const enableSizeOptions = control.enableSizeOptions !== false;
-	const enableRepeatOptions = control.enableRepeatOptions !== false;
-	const enableFixedBackground = control.enableFixedBackground !== false;
-	const enableZoom = control.enableZoom !== false;
+	/* a contained picture is never cropped, moved or tiled: those settings are not offered */
+	const contained = control.contained === 'logos' || control.contained === 'alike' ? control.contained : '';
+	const enableFocalPoint = !contained && control.enableFocalPoint !== false;
+	const enableSizeOptions = !contained && control.enableSizeOptions !== false;
+	const enableRepeatOptions = !contained && control.enableRepeatOptions !== false;
+	const enableFixedBackground = !contained && control.enableFixedBackground !== false;
+	const enableZoom = !contained && control.enableZoom !== false;
 
 	const imageValue = value || {};
 	const focalPoint = imageValue.focalPoint || { x: 0.5, y: 0.5 };
@@ -98,6 +106,7 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 	const repeat = imageValue.repeat !== false;
 	const isFixed = imageValue.isFixed || false;
 	const zoom = Number(imageValue.zoom) > 1 ? Number(imageValue.zoom) : 1;
+	const scale = Number(imageValue.scale) > 0 ? Math.max(80, Math.min(125, Number(imageValue.scale))) : 100;
 
 	const updateValue = (updates) => onChange({ ...imageValue, ...updates });
 
@@ -154,6 +163,24 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 					url={imageValue.url}
 					value={focalPoint}
 					onChange={(p) => updateValue({ focalPoint: p })}
+				/>
+			)}
+
+			{/* A logo in a set is sized by equal area from its own shape; Scale
+			    is for a file that reads light or carries its own padding. */}
+			{contained === 'logos' && (
+				<RangeControl
+					label={__('Scale', 'gcblite')}
+					help={__('Logos in a set are sized to look equal. Nudge one that still reads too big or too small.', 'gcblite')}
+					value={scale}
+					min={80}
+					max={125}
+					step={5}
+					withInputField
+					allowReset
+					resetFallbackValue={100}
+					onChange={(v) => updateValue({ scale: Number(v) > 0 ? Number(v) : 100 })}
+					__nextHasNoMarginBottom
 				/>
 			)}
 
@@ -278,6 +305,7 @@ export default function ImageField({ control, value, onChange }) {
 							repeat: imageValue.repeat !== false,
 							isFixed: imageValue.isFixed || false,
 							customWidth: imageValue.customWidth || '',
+							...(imageValue.scale ? { scale: imageValue.scale } : {}),
 						});
 					}}
 					allowedTypes={resolveAllowedTypes(control)}
