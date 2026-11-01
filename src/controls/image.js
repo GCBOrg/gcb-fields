@@ -159,7 +159,11 @@ export function ImageControlContent({ control, value, onChange, onReplace }) {
 			)}
 
 			{enableFocalPoint && (
+				/* named on the screen (2026-11-02): core's picker shows only the picture and Left / Top, so neither a
+				   person nor the chat's pointer could find "Focal point" by its name */
 				<FocalPointPicker
+					label={__('Focal point', 'gcblite')}
+					help={__('Click the spot that should stay in view when the picture is cropped. Zoom moves in towards it.', 'gcblite')}
 					url={imageValue.url}
 					value={focalPoint}
 					onChange={(p) => updateValue({ focalPoint: p })}
