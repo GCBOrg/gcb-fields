@@ -30,6 +30,14 @@ import { GcbFieldsProvider, renderInspector } from '@wordpress-gcb/fields';
 </GcbFieldsProvider>
 ```
 
+The controls' styles are a stylesheet of their own; import it once, and a
+`wp-scripts` build emits it beside the script (`build/index.css`) for the
+editor:
+
+```js
+import '@wordpress-gcb/fields/style.css';
+```
+
 Each control receives `{ control, value, onChange, attributes }`. The provider
 supplies what the controls need from the host:
 
@@ -52,6 +60,7 @@ editor globals.
 - `shouldRender`, `panelsContainingErrors`, `STRUCTURAL_TYPES`
 - `ValidationContext`, `ControlContext`
 - token helpers: `useTokens`, `getTokensByGroup`, `getAllTokenGroups`
+- `@wordpress-gcb/fields/style.css` — the controls' styles (every rule starts with a control's own class)
 
 ## Links
 

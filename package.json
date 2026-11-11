@@ -1,6 +1,6 @@
 {
   "name": "@wordpress-gcb/fields",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "GCB typed-field controls, inspector renderer, and schema — decoupled from the WordPress plugin so any Gutenberg/headless editor can use them.",
   "license": "GPL-2.0-or-later",
   "homepage": "https://gutenbergcontrolblocks.com",
@@ -22,8 +22,12 @@
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
-    "./conditional-logic": "./dist/conditional-logic.js"
+    "./conditional-logic": "./dist/conditional-logic.js",
+    "./style.css": "./dist/style.css"
   },
+  "sideEffects": [
+    "*.css"
+  ],
   "files": [
     "dist"
   ],
