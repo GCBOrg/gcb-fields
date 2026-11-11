@@ -1,6 +1,6 @@
 {
   "name": "@wordpress-gcb/fields",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "GCB typed-field controls, inspector renderer, and schema — decoupled from the WordPress plugin so any Gutenberg/headless editor can use them.",
   "license": "GPL-2.0-or-later",
   "homepage": "https://gutenbergcontrolblocks.com",

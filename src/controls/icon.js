@@ -60,7 +60,7 @@ async function fetchAllIconPages() {
 	// WP 7.0's icons endpoint caps per_page at 100 and there are 88
 	// core icons. WP 7.1+ lets plugins register more, so paginate at
 	// 100/page — but WP's endpoint IGNORES page/per_page and returns every
-	// icon each time (2026-10-07, gcb-lite's Showman's Show kit: with 102
+	// icon each time (2026-10-07, a site with 102 registered icons: with 102
 	// icons every page was "full", so this made 49 identical requests and
 	// every icon field read "Unknown icon" meanwhile). So stop when the
 	// server says it was the last page, or a page brings nothing new.
