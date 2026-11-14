@@ -83,6 +83,8 @@
 .gcb-icon-control__option:hover{background:#fff;border-color:#dcdcde}
 .gcb-icon-control__option.is-selected{background:rgba(0,124,186,.12);border-color:var(--wp-admin-theme-color,#007cba);color:var(--wp-admin-theme-color,#007cba)}
 .gcb-icon-control__option-svg svg{display:block;fill:currentColor;height:22px;width:22px}
+/* a line icon that carries its own paint (fill none, a stroke) keeps it: the fill above is for filled glyphs */
+.gcb-icon-control__option-svg svg[fill="none"],.gcb-icon-control__trigger-svg svg[fill="none"]{fill:none}
 .gcb-icon-control__empty{color:#757585;font-size:13px;grid-column:1/-1;margin:0;padding:12px 0;text-align:center}
 .gcb-icon-control__footer{border-top:1px solid #f0f0f1;display:flex;justify-content:flex-end;margin-top:4px;padding-top:8px}
 .gcb-media-trigger-badges{align-items:center;display:inline-flex;gap:6px}

@@ -24,6 +24,10 @@
  *                          subset for a specific block ("only show
  *                          these 5 brand icons here").
  *
+ * A caller that is not a sidebar field (a toolbar button that drops an
+ * icon into a line of text) passes `renderTrigger({ open, toggle, ref,
+ * icon })` as a prop: its own button opens this same picker.
+ *
  * Both options are no-ops on plain WP 7.0 because the registry only
  * contains `core/*` icons (filtering to `namespace: "icomoon"`
  * yields zero icons until something registers them). When WP 7.1
@@ -101,6 +105,18 @@ function fetchIcons() {
 	return iconFetchPromise;
 }
 
+/**
+ * MORE PLACES TO LOOK. The registry above is everything WordPress has registered, sent whole. A host with icon
+ * sets too big to send whole (thousands of icons, searched by name and tag on its server) hands the picker a
+ * source: { search(words) → Promise<[{ name, label, content }]>, byName(names) → the same for named icons }.
+ * With a source set, the grid shows what the source's search returns (the host includes the registry's icons in
+ * it), and a chosen icon the registry does not have is drawn from byName.
+ */
+let iconSource = null;
+export function setIconSource(source) {
+	iconSource = source && typeof source.search === 'function' ? source : null;
+}
+
 function useIcons() {
 	const [icons, setIcons] = useState(iconCache);
 	const [error, setError] = useState(null);
@@ -148,23 +164,49 @@ function normalize(v) {
 	};
 }
 
-export default function IconField({ control, value, onChange }) {
+export default function IconField({ control, value, onChange, renderTrigger }) {
 	const current = normalize(value);
 	const { icons, error } = useIcons();
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
 	const triggerRef = useRef(null);
 
-	const currentIcon = useMemo(() => {
-		if (!icons || !current.name) return null;
-		return icons.find((i) => i.name === current.name) || null;
+	// What the host's source found for the words typed (null until it answers).
+	const [found, setFound] = useState(null);
+	useEffect(() => {
+		if (!iconSource || !open) return undefined;
+		let live = true;
+		const timer = setTimeout(() => {
+			iconSource.search(search)
+				.then((list) => { if (live) setFound(Array.isArray(list) ? list : []); })
+				.catch(() => { if (live) setFound([]); });
+		}, search ? 200 : 0);
+		return () => { live = false; clearTimeout(timer); };
+	}, [open, search]);
+
+	// The chosen icon, when it is one only the host's source has.
+	const [named, setNamed] = useState(null);
+	useEffect(() => {
+		if (!iconSource || typeof iconSource.byName !== 'function' || !current.name) return undefined;
+		if (icons && icons.find((i) => i.name === current.name)) return undefined;
+		let live = true;
+		iconSource.byName([current.name])
+			.then((list) => { if (live) setNamed((list || [])[0] || null); })
+			.catch(() => {});
+		return () => { live = false; };
 	}, [icons, current.name]);
+
+	const currentIcon = useMemo(() => {
+		if (!current.name) return null;
+		const known = icons ? icons.find((i) => i.name === current.name) : null;
+		return known || (named && named.name === current.name ? named : null);
+	}, [icons, named, current.name]);
 
 	// Restrict the candidate set BEFORE the search filter — control
 	// config can narrow to a specific namespace or hand-curated list.
 	const candidates = useMemo(() => {
-		if (!icons) return [];
-		let list = icons;
+		if (!icons && !iconSource) return [];
+		let list = iconSource ? (found || []) : icons;
 		if (Array.isArray(control.filter) && control.filter.length > 0) {
 			const allow = new Set(control.filter);
 			list = list.filter((i) => allow.has(i.name));
@@ -173,11 +215,12 @@ export default function IconField({ control, value, onChange }) {
 			list = list.filter((i) => i.name.startsWith(prefix));
 		}
 		return list;
-	}, [icons, control.filter, control.namespace]);
+	}, [icons, found, control.filter, control.namespace]);
 
 	const filtered = useMemo(() => {
 		if (!candidates.length) return [];
-		if (!search) return candidates;
+		// a host's source has already searched (by tag too, which the name would not match)
+		if (!search || iconSource) return candidates;
 		const q = search.toLowerCase();
 		return candidates.filter((i) =>
 			i.name.toLowerCase().includes(q) ||
@@ -195,6 +238,89 @@ export default function IconField({ control, value, onChange }) {
 		onChange({ source: 'wp', name: '' });
 		setOpen(false);
 	};
+
+	const popover = open && (
+		<Popover
+			anchor={triggerRef.current}
+			onClose={() => { setOpen(false); setSearch(''); }}
+			placement="bottom-start"
+			className="gcb-icon-control__popover"
+		>
+			<div className="gcb-icon-control__panel">
+				{error === 'unsupported' && (
+					<p className="gcb-icon-control__error">
+						{__('The icon picker needs WordPress 7.0 or newer.', 'gcblite')}
+					</p>
+				)}
+				{error === 'fetch-failed' && (
+					<p className="gcb-icon-control__error">
+						{__('Could not load icons from the REST API.', 'gcblite')}
+					</p>
+				)}
+				{!error && !icons && (
+					<div className="gcb-icon-control__loading"><Spinner /></div>
+				)}
+				{!error && icons && (
+					<>
+						<TextControl
+							label={__('Search icons', 'gcblite')}
+							hideLabelFromVision
+							placeholder={__('Search…', 'gcblite')}
+							value={search}
+							onChange={setSearch}
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
+						<div className="gcb-icon-control__grid" role="listbox">
+							{filtered.length === 0 && (
+								<p className="gcb-icon-control__empty">
+									{candidates.length === 0 && (control.namespace || control.filter)
+										? sprintf(
+											__('No icons registered for %s yet. Use register_block_icon() to add some.', 'gcblite'),
+											control.namespace
+												? `"${control.namespace}/*"`
+												: __('this picker', 'gcblite')
+										)
+										: __('No icons match.', 'gcblite')}
+								</p>
+							)}
+							{filtered.map((icon) => (
+								<button
+									key={icon.name}
+									type="button"
+									role="option"
+									aria-selected={icon.name === current.name}
+									className={`gcb-icon-control__option${icon.name === current.name ? ' is-selected' : ''}`}
+									title={icon.label}
+									onClick={() => pick(icon.name)}
+								>
+									<IconSvg content={icon.content} className="gcb-icon-control__option-svg" />
+								</button>
+							))}
+						</div>
+						{current.name && (
+							<div className="gcb-icon-control__footer">
+								<Button variant="tertiary" onClick={clear} isDestructive>
+									{__('Clear icon', 'gcblite')}
+								</Button>
+							</div>
+						)}
+					</>
+				)}
+			</div>
+		</Popover>
+	);
+
+	/* A TRIGGER OF THE CALLER'S OWN (a toolbar button, say): the same picker opens from it, so there is one picker
+	   wherever an icon is chosen, and what the picker learns later it learns everywhere. */
+	if (typeof renderTrigger === 'function') {
+		return (
+			<>
+				{renderTrigger({ open, toggle: () => setOpen((v) => !v), ref: triggerRef, icon: currentIcon })}
+				{popover}
+			</>
+		);
+	}
 
 	return (
 		<BaseControl
@@ -238,77 +364,7 @@ export default function IconField({ control, value, onChange }) {
 				)}
 			</div>
 
-			{open && (
-				<Popover
-					anchor={triggerRef.current}
-					onClose={() => { setOpen(false); setSearch(''); }}
-					placement="bottom-start"
-					className="gcb-icon-control__popover"
-				>
-					<div className="gcb-icon-control__panel">
-						{error === 'unsupported' && (
-							<p className="gcb-icon-control__error">
-								{__('The icon picker needs WordPress 7.0 or newer.', 'gcblite')}
-							</p>
-						)}
-						{error === 'fetch-failed' && (
-							<p className="gcb-icon-control__error">
-								{__('Could not load icons from the REST API.', 'gcblite')}
-							</p>
-						)}
-						{!error && !icons && (
-							<div className="gcb-icon-control__loading"><Spinner /></div>
-						)}
-						{!error && icons && (
-							<>
-								<TextControl
-									label={__('Search icons', 'gcblite')}
-									hideLabelFromVision
-									placeholder={__('Search…', 'gcblite')}
-									value={search}
-									onChange={setSearch}
-									__nextHasNoMarginBottom
-									__next40pxDefaultSize
-								/>
-								<div className="gcb-icon-control__grid" role="listbox">
-									{filtered.length === 0 && (
-										<p className="gcb-icon-control__empty">
-											{candidates.length === 0 && (control.namespace || control.filter)
-												? sprintf(
-													__('No icons registered for %s yet. Use register_block_icon() to add some.', 'gcblite'),
-													control.namespace
-														? `"${control.namespace}/*"`
-														: __('this picker', 'gcblite')
-												)
-												: __('No icons match.', 'gcblite')}
-										</p>
-									)}
-									{filtered.map((icon) => (
-										<button
-											key={icon.name}
-											type="button"
-											role="option"
-											aria-selected={icon.name === current.name}
-											className={`gcb-icon-control__option${icon.name === current.name ? ' is-selected' : ''}`}
-											title={icon.label}
-											onClick={() => pick(icon.name)}
-										>
-											<IconSvg content={icon.content} className="gcb-icon-control__option-svg" />
-										</button>
-									))}
-								</div>
-								{current.name && (
-									<div className="gcb-icon-control__footer">
-										<Button variant="tertiary" onClick={clear} isDestructive>
-											{__('Clear icon', 'gcblite')}
-										</Button>
-									</div>
-								)}
-							</>
-						)}
-					</div>
-				</Popover>
-			)}
+			{popover}
 		</BaseControl>
 	);
 }
