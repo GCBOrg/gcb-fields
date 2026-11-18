@@ -196,7 +196,7 @@ function PostObjectMultiSelect({
 					)}
 					renderContent={({ close: onClose, variant }) => (
 						<div style={variant === 'modal' ? { width: '100%' } : { minWidth: 320, maxWidth: 400 }}>
-<div style={{ padding: '0 16px 8px 16px' }}>
+<div style={{ padding: variant === 'modal' ? '0 16px 8px 16px' : '16px 16px 8px 16px' }}>{/* a popout has no title bar above its search: room of its own (Mark, 2026-11-18) */}
 								<TextControl
 									value={search}
 									onChange={(val) => {
@@ -685,7 +685,7 @@ export default function PostObjectField({ control, value, onChange }) {
 					)}
 					renderContent={({ close: onClose, variant }) => (
 						<div style={variant === 'modal' ? { width: '100%' } : { minWidth: 320, maxWidth: 400 }}>
-<div style={{ padding: '0 16px 8px 16px' }}>
+<div style={{ padding: variant === 'modal' ? '0 16px 8px 16px' : '16px 16px 8px 16px' }}>{/* a popout has no title bar above its search: room of its own (Mark, 2026-11-18) */}
 								<TextControl
 									value={search}
 									onChange={(val) => {
